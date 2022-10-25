@@ -1,1 +1,1 @@
-C:\> csv2json filename.csv filename.json header=ON (if there are no column names in the csv file change ON to OFF)
+C:\> csv2json filename.csv filename.json header=ON (if there is no column name in the csv file, change ON to OFF)
