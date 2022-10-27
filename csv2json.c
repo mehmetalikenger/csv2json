@@ -2,148 +2,168 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+
+int ColumnSize(FILE *pFile);
+
+
 int main(int argc, char *argv[]){
 	
-	FILE *pOkunan;
-	
-	if((pOkunan = fopen(argv[1], "r")) == NULL){
-		
-		printf("CSV dosyasi acilamadi...");
-		exit(1);
-	}
-		
-	char okunanKarakter;
-	int sutunKarakterSayac = 0;
-	
-	while((okunanKarakter = getc(pOkunan)) != '\n') {
-		
-		sutunKarakterSayac++;		
-	}
-	
-	char sutunIsimleri[sutunKarakterSayac];
-	
-	sutunKarakterSayac = sizeof(sutunIsimleri);
-	
-	rewind(pOkunan);
-	
-	fread(sutunIsimleri, sutunKarakterSayac, 1, pOkunan);
-	
-	FILE *pYazilan;
-	
-	if((pYazilan = fopen(argv[2], "w")) == NULL){
-		
-		printf("JSON dosyasi acilamadi...");
-		exit(1);
-	}
-		
-	int sutunIndeks = 0;
-	int satirOffset = 1;
 	int i;
-	int k = 1;
-	char virgul = ',';
-	int satirN = 1;
-	bool newLine = false;	
-	char ch;
-	int comma = 1;
+	char charRead;
+	int columnNumber = 1;
+	int numberOfNewLine = 1;		
+	int lineOffset = 1;
+	int columnIndex = 0;
+	bool isNewLine = false;
+	int numberOfColumns;
 	
-	rewind(pOkunan);
-	while((ch = getc(pOkunan)) != EOF){
+	int columnCharCounter = 0;	
+	char comma = ',';
+	char colon = ':';
+	char quotationMark = '"';
+	char curlyOpening = '{';
+	char curlyClosed = '}';
+	char bracketOpening = '[';
+	char bracketClosed = ']';
+	char newLine = '\n';
+	
+	FILE *pCSV;
+	
+	if((pCSV = fopen(argv[1], "r")) == NULL){
+		
+		printf("CSV file cannot be read...");
+		exit(1);
+	}
+		
+	while((charRead = getc(pCSV)) != newLine) {
+		
+		columnCharCounter++;		
+	}
+	
+	char columnNames[columnCharCounter];
+	
+	rewind(pCSV);
+	
+	fread(columnNames, columnCharCounter, 1, pCSV);
+	
+	FILE *pJSON;
+	
+	if((pJSON = fopen(argv[2], "w")) == NULL){
+		
+		printf("JSON file cannot be read...");
+		exit(1);
+	}
+	
+	numberOfColumns = ColumnSize(pCSV);
+			
+	fprintf(pJSON, "%c", bracketOpening);
+	fprintf(pJSON, "\n  %c", curlyOpening);	
+	
+	while(1) {
+				
+		if(!strcmp(argv[3], "header=ON")){
+		
+			fprintf(pJSON, "\n    %c", quotationMark);
+			
+			for(i = columnIndex; i < sizeof(columnNames); i++) {
+				
+				if(columnNames[i] != comma) {
+					
+					fprintf(pJSON, "%c", columnNames[i]);
+							
+				} else {
+					
+					fprintf(pJSON, "%c%c %c", quotationMark, colon, quotationMark);
+					columnIndex = i + 1;
+					break;
+				}	
+					
+				columnIndex = i;	
+				if((columnIndex + 1) == sizeof(columnNames)) {
+					
+					columnIndex = 0;		
+					fprintf(pJSON, "%c%c %c", quotationMark, colon, quotationMark);
+					break;
+				}	
+			}
+			
+			fseek(pCSV, columnCharCounter + numberOfNewLine + lineOffset, SEEK_SET);
+		
+		} else if(!strcmp(argv[3], "header=OFF")){
+			
+			columnCharCounter = 0;
+			
+			fprintf(pJSON, "\n    %c%s%d%c%c %c", quotationMark, "Column", columnNumber, quotationMark, colon, quotationMark);
+			
+			columnNumber++;
+			
+			if(columnNumber == (numberOfColumns)) {
+				
+				columnNumber = 1;
+			}
+			
+			fseek(pCSV, columnCharCounter + numberOfNewLine + lineOffset - 2, SEEK_SET);
+	
+		} else {
+			
+			printf("Error: Wrong syntax...\n");	
+			exit(1);	
+		}
+						
+		while((charRead = getc(pCSV)) != comma) {
+			
+			if((charRead == EOF)){
+				
+				fprintf(pJSON, "%c\n  %c\n%c", quotationMark, curlyClosed, bracketClosed);
+				
+				return 0;
+			}
+					
+			if(charRead == newLine) {
+							
+				numberOfNewLine++;
+				isNewLine = true;
+				break;
+			}
+						
+			fprintf(pJSON, "%c", charRead);
+			lineOffset++;		
+		}
+		
+		if(!isNewLine) {
+			
+			fprintf(pJSON, "%c%c", quotationMark, comma);
+		}
+		
+		if(isNewLine) {
+			
+			fprintf(pJSON, "%c\n  %c%c\n\n  %c", quotationMark, curlyClosed, comma, curlyOpening);
+			isNewLine = false;
+		}
+		
+		lineOffset++;	
+	}						
+}
+
+
+int ColumnSize(FILE *pFile) {
+	
+	rewind(pFile);
+	
+	char ch;
+	int commaCounter = 1;
+		
+	while((ch = getc(pFile)) != EOF){
 		
 		if(ch == ',') {
 			
-			comma++;
+			commaCounter++;
 		
 		} else if(ch == '\n') {
 			
 			break;
 		}
 	}
-			
-	fprintf(pYazilan, "%c", '[');
-	fprintf(pYazilan, "\n  %c", '{');	
 	
-	while(true) {
-				
-		if(!strcmp(argv[3], "header=ON")){
-		
-			fprintf(pYazilan, "\n    %c", '"');
-			
-			for(i = sutunIndeks; i < sizeof(sutunIsimleri); i++) {
-				
-				if(sutunIsimleri[i] != virgul) {
-					
-					fprintf(pYazilan, "%c", sutunIsimleri[i]);
-							
-				} else {
-					
-					fprintf(pYazilan, "%c%c %c", '"',':','"');
-					sutunIndeks = i + 1;
-					break;
-				}	
-					
-				sutunIndeks = i;	
-				if((sutunIndeks + 1) == sizeof(sutunIsimleri)) {
-					
-					sutunIndeks = 0;		
-					fprintf(pYazilan, "%c%c %c", '"',':','"');
-					break;
-				}	
-			}
-			
-			fseek(pOkunan, sutunKarakterSayac + satirOffset + satirN, SEEK_SET);
-		
-		} else if(!strcmp(argv[3], "header=OFF")){
-			
-			sutunKarakterSayac = 0;
-			
-			fprintf(pYazilan, "\n    %c%s%d%c%c %c", '"',"Column",k,'"',':','"');
-			
-			k++;
-			
-			if(k == (comma+1)) {
-				
-				k = 1;
-			}
-			
-			fseek(pOkunan, sutunKarakterSayac + satirOffset + satirN - 2, SEEK_SET);
-	
-		} else {
-			
-			printf("Hatali bilgi girisi...\n");	
-			exit(1);	
-		}
-						
-		while((okunanKarakter = getc(pOkunan)) != virgul) {
-			
-			if((okunanKarakter == EOF)){
-				
-				fprintf(pYazilan, "%c\n  %c\n%c", '"','}',']');
-				
-				return 0;
-			}
-					
-			if(okunanKarakter == '\n') {
-							
-				satirN++;
-				newLine = true;
-				break;
-			}
-						
-			fprintf(pYazilan, "%c", okunanKarakter);
-			satirOffset++;		
-		}
-		
-		if(!newLine) {
-			
-			fprintf(pYazilan, "%c%c", '"',',');
-		}
-		
-		if(newLine) {
-			
-			fprintf(pYazilan, "%c\n  %c%c\n\n  %c", '"', '}',',','{');
-			newLine = false;
-		}
-		
-		satirOffset++;	
-	}						
+	return commaCounter + 1;
 }
